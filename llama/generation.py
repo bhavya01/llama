@@ -263,8 +263,8 @@ class Llama:
         top_p_tensor = torch.tensor(float(top_p)).to(self.device)
         with_temp = temperature > 0
 
-        # if self.device.type == "xla":
-        #     xm.mark_step()
+        if self.device.type == "xla":
+             xm.mark_step()
 
         decoding_start_time = time.time()
         prev_pos = 0
@@ -296,6 +296,7 @@ class Llama:
                 )
 
             prev_pos = cur_pos
+            xm.mark_step()
 
         assert cur_pos_tensor.item() == prev_pos + 1 and prev_pos == min_prompt_len
         for cur_pos in range(prev_pos + 1, total_len):
@@ -306,6 +307,7 @@ class Llama:
                     output_pos_tensor, temperature_tensor,
                     top_p_tensor, with_temp, logprobs, token_logprobs, eos_reached, pad_id
                 )
+            xm.mark_step()
             if cur_pos % 10 == 0:
                 if all(eos_reached):
                     break

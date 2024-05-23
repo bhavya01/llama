@@ -65,12 +65,17 @@ def main(
 
     import time
     # print("About to start in 10 seconds")
-    # server = xp.start_server(9012, only_on_master=False)
-    # time.sleep(10)
+    server = xp.start_server(9012, only_on_master=False)
+    time.sleep(2)
     print("Starting!")
 
-    for _ in range(2):
+    for i in range(2):
         with torch.no_grad():
+            if i == 1:
+                profile_logdir = os.environ['PROFILE_LOGDIR']
+                # Use trace_detached to capture the profile from a background thread
+                xp.trace_detached('localhost:9012', profile_logdir, duration_ms=10000)
+
             results = generator.text_completion(
                 prompts,
                 max_gen_len=max_gen_len,
