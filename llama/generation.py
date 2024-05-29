@@ -149,22 +149,22 @@ class Llama:
                 for layer in model.layers:
                     xs.mark_sharding(layer.attention.cache_k, mesh, (None, None, 0, None))
                     xs.mark_sharding(layer.attention.cache_v, mesh, (None, None, 0, None))
-
+            # linear layers are transposed
             for name, layer in model.named_modules():
                 if 'tok_embeddings' in name:
-                    xs.mark_sharding(layer.weight, mesh, ('model', 'data'))
+                    xs.mark_sharding(layer.weight, mesh, col_partition)
                 if 'attention.' in name:
                     if 'wo' in name:
-                        xs.mark_sharding(layer.weight, mesh, ('model', 'data'))
+                        xs.mark_sharding(layer.weight, mesh, row_partition) # Actually, this will be col
                     else:
-                        xs.mark_sharding(layer.weight, mesh, ('data', 'model'))
+                        xs.mark_sharding(layer.weight, mesh, col_partition) # Actually, this will be row
                 if 'feed_forward.' in name:
                     if 'w2' in name:
-                        xs.mark_sharding(layer.weight, mesh, ('model', 'data'))
+                        xs.mark_sharding(layer.weight, mesh, row_partition) # Actually, this will col
                     else:
-                        xs.mark_sharding(layer.weight, mesh, ('data', 'model'))
+                        xs.mark_sharding(layer.weight, mesh, col_partition) #Actually, this will be row
                 if 'output' in name:
-                    xs.mark_sharding(layer.weight, mesh, ('data', 'model'))
+                    xs.mark_sharding(layer.weight, mesh, col_partition) #Actually, this will be row
 
         if dynamo:
             if USE_CUDA:
@@ -264,8 +264,8 @@ class Llama:
         with_temp = temperature > 0
 
         if self.device.type == "xla":
-             xm.mark_step()
-
+            #xm.mark_step()
+            pass
         decoding_start_time = time.time()
         prev_pos = 0
         buckets = [128, 256, 384, 512]
@@ -296,7 +296,7 @@ class Llama:
                 )
 
             prev_pos = cur_pos
-            xm.mark_step()
+            #xm.mark_step()
 
         assert cur_pos_tensor.item() == prev_pos + 1 and prev_pos == min_prompt_len
         for cur_pos in range(prev_pos + 1, total_len):
@@ -307,7 +307,7 @@ class Llama:
                     output_pos_tensor, temperature_tensor,
                     top_p_tensor, with_temp, logprobs, token_logprobs, eos_reached, pad_id
                 )
-            xm.mark_step()
+            #xm.mark_step()
             if cur_pos % 10 == 0:
                 if all(eos_reached):
                     break
